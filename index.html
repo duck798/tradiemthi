@@ -35,20 +35,20 @@
     </div>
 
     <script>
-        let dataSo1 = [], dataTruongText = "", dataSo2 = [];
+        let dataso1 = [], datatruongText = "", dataso2 = [];
         let isDataReady = false;
 
         async function loadData() {
             let loi = [];
             try {
                 const resSo1 = await fetch('so1.csv'); 
-                if (!resSo1.ok) loi.push('so1.csv'); else dataSo1 = Papa.parse(await resSo1.text(), {header: true, skipEmptyLines: true}).data;
+                if (!resso1.ok) loi.push('so1.csv'); else dataso1 = Papa.parse(await resso1.text(), {header: true, skipEmptyLines: true}).data;
 
-                const resTruong = await fetch('truong.csv');
-                if (!resTruong.ok) loi.push('truong.csv'); else dataTruongText = await resTruong.text();
+                const restruong = await fetch('truong.csv');
+                if (!restruong.ok) loi.push('truong.csv'); else datatruongText = await restruong.text();
 
-                const resSo2 = await fetch('so2.csv');
-                if (!resSo2.ok) loi.push('so2.csv'); else dataSo2 = Papa.parse(await resSo2.text(), {header: true, skipEmptyLines: true}).data;
+                const resso2 = await fetch('so2.csv');
+                if (!resso2.ok) loi.push('so2.csv'); else dataso2 = Papa.parse(await resso2.text(), {header: true, skipEmptyLines: true}).data;
 
                 if (loi.length > 0) {
                     document.getElementById('status').innerHTML = "⚠️ Lỗi! Web không tìm thấy file: <b>" + loi.join(", ") + "</b><br>Nếu vừa up, hãy đợi 3 phút rồi tải lại trang!";
@@ -73,8 +73,8 @@
         }
 
         function timDiemTruong(name) {
-            if (!dataTruongText) return 0;
-            const lines = dataTruongText.split('\n');
+            if (!datatruongText) return 0;
+            const lines = datatruongText.split('\n');
             let maxScore = 0;
             for (let l of lines) {
                 if (l.toLowerCase().includes(name)) {
@@ -96,20 +96,20 @@
             const resultDiv = document.getElementById('result');
             if (!name) return;
 
-            const hsSo1 = dataSo1.find(r => r['Họ và tên'] && r['Họ và tên'].toLowerCase() === name);
-            const hsSo2 = dataSo2.find(r => r['Họ và tên'] && r['Họ và tên'].toLowerCase() === name);
+            const hsso1 = dataso1.find(r => r['Họ và tên'] && r['Họ và tên'].toLowerCase() === name);
+            const hsso2 = dataso2.find(r => r['Họ và tên'] && r['Họ và tên'].toLowerCase() === name);
             const tongTruong = timDiemTruong(name);
 
-            if (!hsSo1 && !hsSo2 && tongTruong === 0) {
+            if (!hsso1 && !hsso2 && tongtruong === 0) {
                 resultDiv.style.display = "block";
                 resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">Không tìm thấy "${name.toUpperCase()}"!</span>`;
                 return;
             }
 
-            const tongSo1 = tinhTongSo(hsSo1);
-            const tongSo2 = tinhTongSo(hsSo2);
-            const cl1 = tongTruong - tongSo1;
-            const cl2 = tongSo2 - tongTruong;
+            const tongso1 = tinhTongSo(hsso1);
+            const tongso2 = tinhTongSo(hsso2);
+            const cl1 = tongtruong - tongso1;
+            const cl2 = tongso2 - tongtruong;
 
             const formatCL = (val) => {
                 if (val > 0) return `<span class="diff up">tăng ${val.toFixed(2)}</span>`;
@@ -118,16 +118,16 @@
             };
 
             let tohop = "D01 hoặc khối xét tuyển kết hợp";
-            const note = ((hsSo2 || hsSo1 || {})['Ghi chú'] || '').toLowerCase();
+            const note = ((hsso2 || hsso1 || {})['Ghi chú'] || '').toLowerCase();
             if (note.includes('vật lí') || note.includes('hóa học')) tohop = "A00, A01 hoặc B00";
             else if (note.includes('lịch sử') || note.includes('địa lí')) tohop = "C00, C04 hoặc D01";
 
             resultDiv.style.display = "block";
             resultDiv.innerHTML = `
-                <div style="font-size:18px; font-weight:bold; margin-bottom:10px; text-transform: uppercase;">🎓 ${hsSo2 ? hsSo2['Họ và tên'] : (hsSo1 ? hsSo1['Họ và tên'] : name)}</div>
-                <b>Sở đợt 1:</b> ${tongSo1 > 0 ? tongSo1.toFixed(2) : '0'}<br>
-                <b>Trường:</b> ${tongTruong > 0 ? tongTruong.toFixed(2) : '0'} <i>(${tongTruong > 0 && tongSo1 > 0 ? formatCL(cl1) : '—'})</i><br>
-                <b>Sở đợt 2:</b> ${tongSo2 > 0 ? tongSo2.toFixed(2) : '0'} <i>(${tongSo2 > 0 && tongTruong > 0 ? formatCL(cl2) : '—'})</i>
+                <div style="font-size:18px; font-weight:bold; margin-bottom:10px; text-transform: uppercase;">🎓 ${hsso2 ? hsso2['Họ và tên'] : (hsso1 ? hsso1['Họ và tên'] : name)}</div>
+                <b>Sở đợt 1:</b> ${tongso1 > 0 ? tongso1.toFixed(2) : '0'}<br>
+                <b>Trường:</b> ${tongtruong > 0 ? tongtruong.toFixed(2) : '0'} <i>(${tongtruong > 0 && tongso1 > 0 ? formatCL(cl1) : '—'})</i><br>
+                <b>Sở đợt 2:</b> ${tongso2 > 0 ? tongso2.toFixed(2) : '0'} <i>(${tongso2 > 0 && tongtruong > 0 ? formatCL(cl2) : '—'})</i>
                 <div class="combo">💡 Tổ hợp: ${tohop} <br>Tập trung cày Toán, Anh và bài thi Đánh giá tư duy để chốt ngành Quản lý thông tin ông nhé!</div>
             `;
         }
