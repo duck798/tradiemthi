@@ -25,7 +25,7 @@
 <body>
     <div class="container">
         <h2>Điểm Khảo Sát 3 Đợt</h2>
-        <div id="status" style="background:#fff3cd; color:#856404;">⏳ Đang đọc dữ liệu điểm...</div>
+        <div id="status" style="background:#fff3cd; color:#856404;">⏳ Đang kiểm tra từng file...</div>
         
         <div class="search-box">
             <input type="text" id="nameInput" placeholder="Nhập họ và tên (VD: Đinh Thành Đức)">
@@ -39,24 +39,29 @@
         let isDataReady = false;
 
         async function loadData() {
+            let loi = [];
             try {
-                const [resSo1, resTruong, resSo2] = await Promise.all([
-                    fetch('so1.csv'), fetch('truong.csv'), fetch('so2.csv')
-                ]);
-                if (!resSo1.ok || !resTruong.ok || !resSo2.ok) throw new Error("Thiếu file");
+                const resSo1 = await fetch('so1.csv'); 
+                if (!resSo1.ok) loi.push('so1.csv'); else dataSo1 = Papa.parse(await resSo1.text(), {header: true, skipEmptyLines: true}).data;
 
-                dataSo1 = Papa.parse(await resSo1.text(), {header: true, skipEmptyLines: true}).data;
-                dataTruongText = await resTruong.text();
-                dataSo2 = Papa.parse(await resSo2.text(), {header: true, skipEmptyLines: true}).data;
-                
-                document.getElementById('status').innerHTML = "✅ Dữ liệu sẵn sàng! Anh em tra cứu đi.";
-                document.getElementById('status').style.background = "#e7f3ff";
-                document.getElementById('status').style.color = "#1877f2";
-                isDataReady = true;
+                const resTruong = await fetch('truong.csv');
+                if (!resTruong.ok) loi.push('truong.csv'); else dataTruongText = await resTruong.text();
+
+                const resSo2 = await fetch('so2.csv');
+                if (!resSo2.ok) loi.push('so2.csv'); else dataSo2 = Papa.parse(await resSo2.text(), {header: true, skipEmptyLines: true}).data;
+
+                if (loi.length > 0) {
+                    document.getElementById('status').innerHTML = "⚠️ Lỗi! Web không tìm thấy file: <b>" + loi.join(", ") + "</b><br>Nếu vừa up, hãy đợi 3 phút rồi tải lại trang!";
+                    document.getElementById('status').style.background = "#ffebe8";
+                    document.getElementById('status').style.color = "#e41e3f";
+                } else {
+                    document.getElementById('status').innerHTML = "✅ Dữ liệu sẵn sàng! Anh em tra cứu đi.";
+                    document.getElementById('status').style.background = "#e7f3ff";
+                    document.getElementById('status').style.color = "#1877f2";
+                    isDataReady = true;
+                }
             } catch (e) {
-                document.getElementById('status').innerHTML = "⚠️ Lỗi: Web chưa đọc được 3 file CSV.<br>Chắc do chưa up file lên hoặc up sai tên rồi!";
-                document.getElementById('status').style.background = "#ffebe8";
-                document.getElementById('status').style.color = "#e41e3f";
+                document.getElementById('status').innerHTML = "⚠️ Không kết nối được dữ liệu!";
             }
         }
         loadData();
@@ -86,7 +91,7 @@
         }
 
         function traCuu() {
-            if (!isDataReady) { alert("Chưa có dữ liệu, web đang lỗi đọc file!"); return; }
+            if (!isDataReady) { alert("Dữ liệu chưa tải xong, đợi tí ông ơi!"); return; }
             const name = document.getElementById('nameInput').value.trim().toLowerCase();
             const resultDiv = document.getElementById('result');
             if (!name) return;
@@ -97,7 +102,7 @@
 
             if (!hsSo1 && !hsSo2 && tongTruong === 0) {
                 resultDiv.style.display = "block";
-                resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">Không tìm thấy "${name.toUpperCase()}"! Gõ đúng họ tên có dấu nhé.</span>`;
+                resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">Không tìm thấy "${name.toUpperCase()}"!</span>`;
                 return;
             }
 
