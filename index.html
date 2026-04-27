@@ -1,111 +1,282 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tra Cứu Điểm</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-<style>
-body{font-family:sans-serif;max-width:600px;margin:20px auto;padding:15px;background:#f0f2f5;}
-.box{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
-input{width:100%;padding:12px;margin-bottom:10px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:16px;}
-button{width:100%;padding:12px;background:#1877f2;color:#fff;border:none;border-radius:6px;font-weight:bold;font-size:16px;}
-#msg{margin-bottom:15px;padding:10px;border-radius:6px;text-align:center;font-weight:bold;background:#fff3cd;}
-#res{margin-top:15px;padding:15px;background:#f7f8fa;border-left:4px solid #1877f2;display:none;line-height:1.6;}
-.up{color:green;font-weight:bold;} .down{color:red;font-weight:bold;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tra cứu điểm khảo sát - THPT Hưng Hóa</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { text-align: center; color: #1e3a8a; margin-bottom: 8px; }
+        .subtitle { text-align: center; color: #64748b; margin-bottom: 25px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }
+        .search-box input { flex: 1; min-width: 200px; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; }
+        .search-box button { padding: 12px 25px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .search-box button:hover { background: #1d4ed8; }
+        #suggestions { background: white; border: 1px solid #cbd5e1; border-radius: 8px; max-height: 200px; overflow-y: auto; display: none; }
+        .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+        .suggestion-item:hover { background: #f8fafc; }
+        .result { margin-top: 20px; }
+        .student-info { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .student-info h2 { color: #0f172a; margin-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: center; }
+        th { background: #2563eb; color: white; }
+        .compare-up { color: #16a34a; font-weight: bold; }
+        .compare-down { color: #dc2626; font-weight: bold; }
+        .note-box { background: #fff7ed; border-left: 4px solid #f97316; padding: 15px; margin-top: 20px; border-radius: 8px; }
+        .university-list { margin-top: 15px; }
+        .university-item { padding: 8px 12px; margin: 5px 0; background: #f1f5f9; border-radius: 6px; }
+        .error { color: #dc2626; margin-top: 10px; }
+        .loading { text-align: center; padding: 20px; color: #64748b; }
+    </style>
 </head>
 <body>
-<div class="box">
-<div id="msg">Đang tải dữ liệu...</div>
-<input type="text" id="txtName" placeholder="Nhập họ và tên...">
-<button onclick="search()">Tra cứu</button>
-<div id="res"></div>
+<div class="container">
+    <h1>📊 Tra cứu điểm khảo sát</h1>
+    <p class="subtitle">THPT Hưng Hóa - So sánh 3 đợt: Sở 1 · Trường · Sở 2</p>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Nhập tên học sinh..." autocomplete="off" />
+        <button onclick="searchStudent()">🔍 Tra cứu</button>
+    </div>
+    <div id="suggestions"></div>
+    <div id="resultContainer" class="result">
+        <div class="loading">Vui lòng nhập tên để tra cứu.</div>
+    </div>
 </div>
+
 <script>
-let d1=[],d2="",d3=[];
-let ready=false;
+// ---- Dữ liệu toàn cục ----
+let allStudents = [];   // gộp từ 3 file
+let dataLoaded = false;
 
-async function init(){
-    try{
-        let [r1,r2,r3]=await Promise.all([fetch('so1.csv'),fetch('truong.csv'),fetch('so2.csv')]);
-        if(!r1.ok||!r2.ok||!r3.ok) throw new Error();
-        d1=Papa.parse(await r1.text(),{header:true,skipEmptyLines:true}).data;
-        d2=await r2.text();
-        d3=Papa.parse(await r3.text(),{header:true,skipEmptyLines:true}).data;
-        document.getElementById('msg').innerText="Dữ liệu đã sẵn sàng";
-        document.getElementById('msg').style.background="#d4edda";
-        ready=true;
-    }catch(e){
-        document.getElementById('msg').innerText="Lỗi tải file csv";
-        document.getElementById('msg').style.background="#f8d7da";
-    }
-}
-init();
+// ---- Hàm đọc file Excel ----
+async function loadExcelFile(url) {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    let allRows = [];
+    workbook.SheetNames.forEach(sheetName => {
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (json.length > 1) {
+            // Lấy header từ dòng đầu tiên
+            const headers = json[0].map(h => h.toString().trim().toLowerCase());
+            // Các cột cần tìm: stt, họ tên, toán, văn, ngoại ngữ (anh), lý, hóa, sinh, sử, địa, gdcd
+            const getColIndex = (names) => {
+                for (let n of names) {
+                    const idx = headers.indexOf(n);
+                    if (idx !== -1) return idx;
+                }
+                return -1;
+            };
+            const idxName = getColIndex(['họ và tên', 'ho ten', 'họ tên', 'ho va ten', 'tên']);
+            const idxToan = getColIndex(['toán', 'toan']);
+            const idxVan = getColIndex(['văn', 'van', 'ngữ văn']);
+            const idxAnh = getColIndex(['anh', 'tiếng anh', 'ngoại ngữ', 'english']);
+            const idxLy = getColIndex(['lý', 'ly', 'vật lý']);
+            const idxHoa = getColIndex(['hóa', 'hoa', 'hoá']);
+            const idxSinh = getColIndex(['sinh', 'sinh học']);
+            const idxSu = getColIndex(['sử', 'su', 'lịch sử']);
+            const idxDia = getColIndex(['địa', 'dia', 'địa lý']);
+            const idxGDCD = getColIndex(['gdcd', 'giáo dục công dân']);
 
-function sum13(r){
-    if(!r) return 0;
-    let s=0;
-    ['Điểm Toán','Điểm Ngữ văn','Điểm Tổ hợp môn thứ 1','Điểm Tổ hợp môn thứ 2'].forEach(k=>{
-        let v=parseFloat(r[k]);
-        if(!isNaN(v)) s+=v;
-    });
-    return s;
-}
-
-function sum2(n){
-    if(!d2) return 0;
-    let lines=d2.split('\n');
-    let m=0;
-    for(let l of lines){
-        if(l.toLowerCase().includes(n)){
-            let p=l.split(/[,;]/);
-            let s=0;
-            for(let i=6;i<p.length;i++){
-                let v=parseFloat(p[i]);
-                if(!isNaN(v)) s+=v;
+            for (let i = 1; i < json.length; i++) {
+                const row = json[i];
+                const name = row[idxName]?.toString().trim();
+                if (!name || name === '') continue;
+                const student = {
+                    name: name,
+                    toan: parseFloat(row[idxToan]) || 0,
+                    van: parseFloat(row[idxVan]) || 0,
+                    anh: parseFloat(row[idxAnh]) || 0,
+                    ly: parseFloat(row[idxLy]) || 0,
+                    hoa: parseFloat(row[idxHoa]) || 0,
+                    sinh: parseFloat(row[idxSinh]) || 0,
+                    su: parseFloat(row[idxSu]) || 0,
+                    dia: parseFloat(row[idxDia]) || 0,
+                    gdcd: parseFloat(row[idxGDCD]) || 0,
+                };
+                allRows.push(student);
             }
-            if(s>m) m=s;
         }
+    });
+    return allRows;
+}
+
+// ---- Hàm gộp dữ liệu 3 file ----
+async function loadAllData() {
+    try {
+        const [data1, data2, data3] = await Promise.all([
+            loadExcelFile('data/so1.csv'),  // Sở đợt 1
+            loadExcelFile('data/truong.csv'), // Khảo sát trường
+            loadExcelFile('data/so2.csv')    // Sở đợt 2
+        ]);
+        // Gán nhãn đợt cho từng học sinh
+        data1.forEach(s => s.period = 'Sở 1');
+        data2.forEach(s => s.period = 'Trường');
+        data3.forEach(s => s.period = 'Sở 2');
+        allStudents = [...data1, ...data2, ...data3];
+        dataLoaded = true;
+        console.log('Đã tải xong dữ liệu, tổng số bản ghi:', allStudents.length);
+    } catch (err) {
+        console.error('Lỗi tải dữ liệu:', err);
+        document.getElementById('resultContainer').innerHTML = 
+            '<div class="error">⚠️ Không thể tải dữ liệu. Hãy kiểm tra đường dẫn file.</div>';
     }
-    return m;
 }
 
-function fmt(v){
-    if(v>0) return `<span class="up">+${v.toFixed(2)}</span>`;
-    if(v<0) return `<span class="down">${v.toFixed(2)}</span>`;
-    return `0`;
-}
-
-function search(){
-    if(!ready) return;
-    let n=document.getElementById('txtName').value.trim().toLowerCase();
-    let res=document.getElementById('res');
-    if(!n) return;
-
-    let r1=d1.find(x=>x['Họ và tên']&&x['Họ và tên'].toLowerCase()===n);
-    let r3=d3.find(x=>x['Họ và tên']&&x['Họ và tên'].toLowerCase()===n);
-    let s2=sum2(n);
-
-    if(!r1&&!r3&&s2===0){
-        res.innerHTML="Không tìm thấy dữ liệu!";
-        res.style.display="block";
+// ---- Tìm kiếm học sinh ----
+function searchStudent() {
+    const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (!keyword) {
+        alert('Vui lòng nhập tên!');
+        return;
+    }
+    if (!dataLoaded) {
+        document.getElementById('resultContainer').innerHTML = '<div class="loading">Đang tải dữ liệu, vui lòng thử lại sau vài giây...</div>';
         return;
     }
 
-    let s1=sum13(r1);
-    let s3=sum13(r3);
-    let c1=s2-s1;
-    let c2=s3-s2;
+    // Tìm tất cả học sinh có tên chứa keyword (không phân biệt hoa thường)
+    const matched = allStudents.filter(s => s.name.toLowerCase().includes(keyword));
+    if (matched.length === 0) {
+        document.getElementById('resultContainer').innerHTML = 
+            `<div class="error">❌ Không tìm thấy học sinh nào có tên "${keyword}"</div>`;
+        return;
+    }
 
-    res.innerHTML=`
-        <div style="font-size:18px;font-weight:bold;margin-bottom:10px;text-transform:uppercase;">${r3?r3['Họ và tên']:(r1?r1['Họ và tên']:n)}</div>
-        Sở đợt 1: <b>${s1>0?s1.toFixed(2):'0'}</b><br>
-        Trường: <b>${s2>0?s2.toFixed(2):'0'}</b> <i>(${s2>0&&s1>0?fmt(c1):'-'})</i><br>
-        Sở đợt 2: <b>${s3>0?s3.toFixed(2):'0'}</b> <i>(${s3>0&&s2>0?fmt(c2):'-'})</i>
+    // Nhóm theo tên chính xác (có thể có nhiều bản ghi cùng tên ở các đợt)
+    const studentNames = [...new Set(matched.map(s => s.name))];
+    // Lấy tên đầu tiên trong danh sách (nếu tìm nhiều, hiển thị từng người một, có thể thêm chọn)
+    const targetName = studentNames[0];
+    const records = matched.filter(s => s.name === targetName);
+
+    // Lấy điểm theo từng đợt
+    const getRecord = (period) => records.find(r => r.period === period) || null;
+    const s1 = getRecord('Sở 1');
+    const s2 = getRecord('Trường');
+    const s3 = getRecord('Sở 2');
+
+    // Tạo bảng so sánh
+    const monHoc = ['toan', 'van', 'anh', 'ly', 'hoa', 'sinh', 'su', 'dia', 'gdcd'];
+    const tenMon = { toan:'Toán', van:'Văn', anh:'Anh', ly:'Lý', hoa:'Hóa', sinh:'Sinh', su:'Sử', dia:'Địa', gdcd:'GDCD' };
+
+    let tableRows = '';
+    monHoc.forEach(m => {
+        const d1 = s1 ? s1[m] : '-';
+        const d2 = s2 ? s2[m] : '-';
+        const d3 = s3 ? s3[m] : '-';
+        let change12 = '', change23 = '';
+        if (s1 && s2 && typeof d1 === 'number' && typeof d2 === 'number') {
+            const diff = d2 - d1;
+            if (diff > 0) change12 = `<span class="compare-up">▲${diff.toFixed(1)}</span>`;
+            else if (diff < 0) change12 = `<span class="compare-down">▼${Math.abs(diff).toFixed(1)}</span>`;
+            else change12 = '0';
+        }
+        if (s2 && s3 && typeof d2 === 'number' && typeof d3 === 'number') {
+            const diff = d3 - d2;
+            if (diff > 0) change23 = `<span class="compare-up">▲${diff.toFixed(1)}</span>`;
+            else if (diff < 0) change23 = `<span class="compare-down">▼${Math.abs(diff).toFixed(1)}</span>`;
+            else change23 = '0';
+        }
+        tableRows += `<tr>
+            <td><strong>${tenMon[m]}</strong></td>
+            <td>${d1}</td><td>${d2}</td><td>${d3}</td>
+            <td>${change12 || '-'}</td><td>${change23 || '-'}</td>
+        </tr>`;
+    });
+
+    // Tính tổ hợp và gợi ý
+    const calcAvg = (arr) => arr.filter(v => typeof v === 'number' && v > 0);
+    const khoiTN = s3 ? calcAvg([s3.ly, s3.hoa, s3.sinh]) : [];
+    const khoiXH = s3 ? calcAvg([s3.su, s3.dia, s3.gdcd]) : [];
+    const avgTN = khoiTN.length ? (khoiTN.reduce((a,b)=>a+b,0)/khoiTN.length).toFixed(1) : '-';
+    const avgXH = khoiXH.length ? (khoiXH.reduce((a,b)=>a+b,0)/khoiXH.length).toFixed(1) : '-';
+
+    // Gợi ý trường (dữ liệu mẫu, cần cập nhật thực tế)
+    const universitySuggestions = [
+        { name: 'ĐH Bách Khoa Hà Nội', khoi: 'A00', score: 24 },
+        { name: 'ĐH Kinh tế Quốc dân', khoi: 'A01', score: 26 },
+        { name: 'ĐH Sư phạm Hà Nội', khoi: 'C00', score: 25 },
+        { name: 'ĐH Y Hà Nội', khoi: 'B00', score: 27 },
+        { name: 'HV Công nghệ Bưu chính Viễn thông', khoi: 'A01', score: 23 },
+        { name: 'ĐH Thương mại', khoi: 'D01', score: 24 },
+    ];
+
+    function suggestUniversity(math, lit, eng, tn, xh) {
+        let suggestions = [];
+        const totalTN = math + eng + parseFloat(tn);
+        const totalXH = math + lit + eng + parseFloat(xh);
+        universitySuggestions.forEach(uni => {
+            let relevantScore = 0;
+            if (uni.khoi === 'A00' || uni.khoi === 'A01') relevantScore = math + eng + parseFloat(tn);
+            else if (uni.khoi === 'D01') relevantScore = math + lit + eng;
+            else if (uni.khoi === 'C00') relevantScore = lit + parseFloat(xh) + (xh ? parseFloat(tn) : 0); // tạm tính
+            else if (uni.khoi === 'B00') relevantScore = math + eng + (parseFloat(tn) || parseFloat(xh));
+            if (relevantScore >= uni.score - 1) {
+                suggestions.push(`${uni.name} (${uni.khoi}: ~${uni.score}đ)`);
+            }
+        });
+        return suggestions.length ? suggestions : ['Chưa đủ dữ liệu để gợi ý'];
+    }
+
+    const s3Math = s3 ? s3.toan : 0;
+    const s3Lit = s3 ? s3.van : 0;
+    const s3Eng = s3 ? s3.anh : 0;
+    const suggestions = suggestUniversity(s3Math, s3Lit, s3Eng, avgTN, avgXH);
+
+    // Render kết quả
+    let html = `
+        <div class="student-info">
+            <h2>👨‍🎓 ${targetName}</h2>
+            <p>So sánh điểm qua 3 đợt khảo sát</p>
+        </div>
+        <table>
+            <tr>
+                <th>Môn</th><th>Sở 1</th><th>Trường</th><th>Sở 2</th><th>Thay đổi (1→2)</th><th>Thay đổi (2→3)</th>
+            </tr>
+            ${tableRows}
+        </table>
+        <div style="margin-top:20px;">
+            <h3>📌 Tổ hợp xét tuyển (dựa trên đợt Sở 2)</h3>
+            <p>Điểm trung bình tổ hợp KHTN (Lý, Hóa, Sinh): <strong>${avgTN}</strong></p>
+            <p>Điểm trung bình tổ hợp KHXH (Sử, Địa, GDCD): <strong>${avgXH}</strong></p>
+        </div>
+        <div class="note-box">
+            <strong>🎓 Gợi ý trường đại học phù hợp (tham khảo):</strong>
+            <div class="university-list">
+                ${suggestions.map(s => `<div class="university-item">✔ ${s}</div>`).join('')}
+            </div>
+            <p style="margin-top:10px; font-size:0.9em;">* Gợi ý chỉ mang tính chất tham khảo, dựa trên điểm chuẩn năm trước.</p>
+        </div>
     `;
-    res.style.display="block";
+    document.getElementById('resultContainer').innerHTML = html;
 }
+
+// ---- Gợi ý khi nhập tên ----
+document.getElementById('searchInput').addEventListener('input', function() {
+    const keyword = this.value.trim().toLowerCase();
+    const sug = document.getElementById('suggestions');
+    if (!keyword || !dataLoaded) { sug.style.display = 'none'; return; }
+    const matched = allStudents.filter(s => s.name.toLowerCase().includes(keyword));
+    const uniqueNames = [...new Set(matched.map(s => s.name))].slice(0, 10);
+    if (uniqueNames.length === 0) { sug.style.display = 'none'; return; }
+    sug.innerHTML = uniqueNames.map(n => `<div class="suggestion-item" onclick="selectName('${n}')">${n}</div>`).join('');
+    sug.style.display = 'block';
+});
+
+function selectName(name) {
+    document.getElementById('searchInput').value = name;
+    document.getElementById('suggestions').style.display = 'none';
+    searchStudent();
+}
+
+// ---- Khởi động tải dữ liệu ----
+loadAllData();
 </script>
 </body>
 </html>
