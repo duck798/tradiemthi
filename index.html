@@ -3,280 +3,372 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tra cứu điểm khảo sát - THPT Hưng Hóa</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>Tra Cứu & Phân Tích Điểm Khảo Sát THPT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 30px; }
-        h1 { text-align: center; color: #1e3a8a; margin-bottom: 8px; }
-        .subtitle { text-align: center; color: #64748b; margin-bottom: 25px; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; }
-        .search-box input { flex: 1; min-width: 200px; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; }
-        .search-box button { padding: 12px 25px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        .search-box button:hover { background: #1d4ed8; }
-        #suggestions { background: white; border: 1px solid #cbd5e1; border-radius: 8px; max-height: 200px; overflow-y: auto; display: none; }
-        .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
-        .suggestion-item:hover { background: #f8fafc; }
-        .result { margin-top: 20px; }
-        .student-info { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .student-info h2 { color: #0f172a; margin-bottom: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: center; }
-        th { background: #2563eb; color: white; }
-        .compare-up { color: #16a34a; font-weight: bold; }
-        .compare-down { color: #dc2626; font-weight: bold; }
-        .note-box { background: #fff7ed; border-left: 4px solid #f97316; padding: 15px; margin-top: 20px; border-radius: 8px; }
-        .university-list { margin-top: 15px; }
-        .university-item { padding: 8px 12px; margin: 5px 0; background: #f1f5f9; border-radius: 6px; }
-        .error { color: #dc2626; margin-top: 10px; }
-        .loading { text-align: center; padding: 20px; color: #64748b; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body>
-<div class="container">
-    <h1>📊 Tra cứu điểm khảo sát</h1>
-    <p class="subtitle">THPT Hưng Hóa - So sánh 3 đợt: Sở 1 · Trường · Sở 2</p>
+<body class="text-gray-800 antialiased">
 
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Nhập tên học sinh..." autocomplete="off" />
-        <button onclick="searchStudent()">🔍 Tra cứu</button>
-    </div>
-    <div id="suggestions"></div>
-    <div id="resultContainer" class="result">
-        <div class="loading">Vui lòng nhập tên để tra cứu.</div>
-    </div>
-</div>
-
-<script>
-// ---- Dữ liệu toàn cục ----
-let allStudents = [];   // gộp từ 3 file
-let dataLoaded = false;
-
-// ---- Hàm đọc file Excel ----
-async function loadExcelFile(url) {
-    const response = await fetch(url);
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    let allRows = [];
-    workbook.SheetNames.forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-        if (json.length > 1) {
-            // Lấy header từ dòng đầu tiên
-            const headers = json[0].map(h => h.toString().trim().toLowerCase());
-            // Các cột cần tìm: stt, họ tên, toán, văn, ngoại ngữ (anh), lý, hóa, sinh, sử, địa, gdcd
-            const getColIndex = (names) => {
-                for (let n of names) {
-                    const idx = headers.indexOf(n);
-                    if (idx !== -1) return idx;
-                }
-                return -1;
-            };
-            const idxName = getColIndex(['họ và tên', 'ho ten', 'họ tên', 'ho va ten', 'tên']);
-            const idxToan = getColIndex(['toán', 'toan']);
-            const idxVan = getColIndex(['văn', 'van', 'ngữ văn']);
-            const idxAnh = getColIndex(['anh', 'tiếng anh', 'ngoại ngữ', 'english']);
-            const idxLy = getColIndex(['lý', 'ly', 'vật lý']);
-            const idxHoa = getColIndex(['hóa', 'hoa', 'hoá']);
-            const idxSinh = getColIndex(['sinh', 'sinh học']);
-            const idxSu = getColIndex(['sử', 'su', 'lịch sử']);
-            const idxDia = getColIndex(['địa', 'dia', 'địa lý']);
-            const idxGDCD = getColIndex(['gdcd', 'giáo dục công dân']);
-
-            for (let i = 1; i < json.length; i++) {
-                const row = json[i];
-                const name = row[idxName]?.toString().trim();
-                if (!name || name === '') continue;
-                const student = {
-                    name: name,
-                    toan: parseFloat(row[idxToan]) || 0,
-                    van: parseFloat(row[idxVan]) || 0,
-                    anh: parseFloat(row[idxAnh]) || 0,
-                    ly: parseFloat(row[idxLy]) || 0,
-                    hoa: parseFloat(row[idxHoa]) || 0,
-                    sinh: parseFloat(row[idxSinh]) || 0,
-                    su: parseFloat(row[idxSu]) || 0,
-                    dia: parseFloat(row[idxDia]) || 0,
-                    gdcd: parseFloat(row[idxGDCD]) || 0,
-                };
-                allRows.push(student);
-            }
-        }
-    });
-    return allRows;
-}
-
-// ---- Hàm gộp dữ liệu 3 file ----
-async function loadAllData() {
-    try {
-        const [data1, data2, data3] = await Promise.all([
-            loadExcelFile('data/so1.csv'),  // Sở đợt 1
-            loadExcelFile('data/truong.csv'), // Khảo sát trường
-            loadExcelFile('data/so2.csv')    // Sở đợt 2
-        ]);
-        // Gán nhãn đợt cho từng học sinh
-        data1.forEach(s => s.period = 'Sở 1');
-        data2.forEach(s => s.period = 'Trường');
-        data3.forEach(s => s.period = 'Sở 2');
-        allStudents = [...data1, ...data2, ...data3];
-        dataLoaded = true;
-        console.log('Đã tải xong dữ liệu, tổng số bản ghi:', allStudents.length);
-    } catch (err) {
-        console.error('Lỗi tải dữ liệu:', err);
-        document.getElementById('resultContainer').innerHTML = 
-            '<div class="error">⚠️ Không thể tải dữ liệu. Hãy kiểm tra đường dẫn file.</div>';
-    }
-}
-
-// ---- Tìm kiếm học sinh ----
-function searchStudent() {
-    const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-    if (!keyword) {
-        alert('Vui lòng nhập tên!');
-        return;
-    }
-    if (!dataLoaded) {
-        document.getElementById('resultContainer').innerHTML = '<div class="loading">Đang tải dữ liệu, vui lòng thử lại sau vài giây...</div>';
-        return;
-    }
-
-    // Tìm tất cả học sinh có tên chứa keyword (không phân biệt hoa thường)
-    const matched = allStudents.filter(s => s.name.toLowerCase().includes(keyword));
-    if (matched.length === 0) {
-        document.getElementById('resultContainer').innerHTML = 
-            `<div class="error">❌ Không tìm thấy học sinh nào có tên "${keyword}"</div>`;
-        return;
-    }
-
-    // Nhóm theo tên chính xác (có thể có nhiều bản ghi cùng tên ở các đợt)
-    const studentNames = [...new Set(matched.map(s => s.name))];
-    // Lấy tên đầu tiên trong danh sách (nếu tìm nhiều, hiển thị từng người một, có thể thêm chọn)
-    const targetName = studentNames[0];
-    const records = matched.filter(s => s.name === targetName);
-
-    // Lấy điểm theo từng đợt
-    const getRecord = (period) => records.find(r => r.period === period) || null;
-    const s1 = getRecord('Sở 1');
-    const s2 = getRecord('Trường');
-    const s3 = getRecord('Sở 2');
-
-    // Tạo bảng so sánh
-    const monHoc = ['toan', 'van', 'anh', 'ly', 'hoa', 'sinh', 'su', 'dia', 'gdcd'];
-    const tenMon = { toan:'Toán', van:'Văn', anh:'Anh', ly:'Lý', hoa:'Hóa', sinh:'Sinh', su:'Sử', dia:'Địa', gdcd:'GDCD' };
-
-    let tableRows = '';
-    monHoc.forEach(m => {
-        const d1 = s1 ? s1[m] : '-';
-        const d2 = s2 ? s2[m] : '-';
-        const d3 = s3 ? s3[m] : '-';
-        let change12 = '', change23 = '';
-        if (s1 && s2 && typeof d1 === 'number' && typeof d2 === 'number') {
-            const diff = d2 - d1;
-            if (diff > 0) change12 = `<span class="compare-up">▲${diff.toFixed(1)}</span>`;
-            else if (diff < 0) change12 = `<span class="compare-down">▼${Math.abs(diff).toFixed(1)}</span>`;
-            else change12 = '0';
-        }
-        if (s2 && s3 && typeof d2 === 'number' && typeof d3 === 'number') {
-            const diff = d3 - d2;
-            if (diff > 0) change23 = `<span class="compare-up">▲${diff.toFixed(1)}</span>`;
-            else if (diff < 0) change23 = `<span class="compare-down">▼${Math.abs(diff).toFixed(1)}</span>`;
-            else change23 = '0';
-        }
-        tableRows += `<tr>
-            <td><strong>${tenMon[m]}</strong></td>
-            <td>${d1}</td><td>${d2}</td><td>${d3}</td>
-            <td>${change12 || '-'}</td><td>${change23 || '-'}</td>
-        </tr>`;
-    });
-
-    // Tính tổ hợp và gợi ý
-    const calcAvg = (arr) => arr.filter(v => typeof v === 'number' && v > 0);
-    const khoiTN = s3 ? calcAvg([s3.ly, s3.hoa, s3.sinh]) : [];
-    const khoiXH = s3 ? calcAvg([s3.su, s3.dia, s3.gdcd]) : [];
-    const avgTN = khoiTN.length ? (khoiTN.reduce((a,b)=>a+b,0)/khoiTN.length).toFixed(1) : '-';
-    const avgXH = khoiXH.length ? (khoiXH.reduce((a,b)=>a+b,0)/khoiXH.length).toFixed(1) : '-';
-
-    // Gợi ý trường (dữ liệu mẫu, cần cập nhật thực tế)
-    const universitySuggestions = [
-        { name: 'ĐH Bách Khoa Hà Nội', khoi: 'A00', score: 24 },
-        { name: 'ĐH Kinh tế Quốc dân', khoi: 'A01', score: 26 },
-        { name: 'ĐH Sư phạm Hà Nội', khoi: 'C00', score: 25 },
-        { name: 'ĐH Y Hà Nội', khoi: 'B00', score: 27 },
-        { name: 'HV Công nghệ Bưu chính Viễn thông', khoi: 'A01', score: 23 },
-        { name: 'ĐH Thương mại', khoi: 'D01', score: 24 },
-    ];
-
-    function suggestUniversity(math, lit, eng, tn, xh) {
-        let suggestions = [];
-        const totalTN = math + eng + parseFloat(tn);
-        const totalXH = math + lit + eng + parseFloat(xh);
-        universitySuggestions.forEach(uni => {
-            let relevantScore = 0;
-            if (uni.khoi === 'A00' || uni.khoi === 'A01') relevantScore = math + eng + parseFloat(tn);
-            else if (uni.khoi === 'D01') relevantScore = math + lit + eng;
-            else if (uni.khoi === 'C00') relevantScore = lit + parseFloat(xh) + (xh ? parseFloat(tn) : 0); // tạm tính
-            else if (uni.khoi === 'B00') relevantScore = math + eng + (parseFloat(tn) || parseFloat(xh));
-            if (relevantScore >= uni.score - 1) {
-                suggestions.push(`${uni.name} (${uni.khoi}: ~${uni.score}đ)`);
-            }
-        });
-        return suggestions.length ? suggestions : ['Chưa đủ dữ liệu để gợi ý'];
-    }
-
-    const s3Math = s3 ? s3.toan : 0;
-    const s3Lit = s3 ? s3.van : 0;
-    const s3Eng = s3 ? s3.anh : 0;
-    const suggestions = suggestUniversity(s3Math, s3Lit, s3Eng, avgTN, avgXH);
-
-    // Render kết quả
-    let html = `
-        <div class="student-info">
-            <h2>👨‍🎓 ${targetName}</h2>
-            <p>So sánh điểm qua 3 đợt khảo sát</p>
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="max-w-5xl mx-auto px-4 py-6 text-center">
+            <h1 class="text-2xl md:text-3xl font-bold"><i class="fas fa-graduation-cap mr-2"></i> Hệ Thống Tra Cứu & Phân Tích Điểm</h1>
+            <p class="mt-2 text-blue-100">Dành cho học sinh THPT Hưng Hóa & THPT Tam Nông</p>
         </div>
-        <table>
-            <tr>
-                <th>Môn</th><th>Sở 1</th><th>Trường</th><th>Sở 2</th><th>Thay đổi (1→2)</th><th>Thay đổi (2→3)</th>
-            </tr>
-            ${tableRows}
-        </table>
-        <div style="margin-top:20px;">
-            <h3>📌 Tổ hợp xét tuyển (dựa trên đợt Sở 2)</h3>
-            <p>Điểm trung bình tổ hợp KHTN (Lý, Hóa, Sinh): <strong>${avgTN}</strong></p>
-            <p>Điểm trung bình tổ hợp KHXH (Sử, Địa, GDCD): <strong>${avgXH}</strong></p>
-        </div>
-        <div class="note-box">
-            <strong>🎓 Gợi ý trường đại học phù hợp (tham khảo):</strong>
-            <div class="university-list">
-                ${suggestions.map(s => `<div class="university-item">✔ ${s}</div>`).join('')}
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-8">
+        <!-- Search Form -->
+        <section class="bg-white rounded-xl shadow-md p-6 md:p-8 mb-8 border-t-4 border-blue-500">
+            <form id="searchForm" class="space-y-4 md:space-y-0 md:flex md:gap-4 md:items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Trường THPT</label>
+                    <select id="school" class="w-full border-gray-300 rounded-lg shadow-sm p-3 border focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="HungHoa">THPT Hưng Hóa</option>
+                        <option value="TamNong">THPT Tam Nông</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Họ và Tên</label>
+                    <input type="text" id="studentName" placeholder="VD: Nguyễn Văn A" class="w-full border-gray-300 rounded-lg shadow-sm p-3 border focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Ngày sinh</label>
+                    <input type="text" id="dob" placeholder="VD: 15/05/2006" class="w-full border-gray-300 rounded-lg shadow-sm p-3 border focus:ring-blue-500 focus:border-blue-500" required>
+                </div>
+                <div>
+                    <button type="submit" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-md">
+                        <i class="fas fa-search mr-2"></i> Tra cứu
+                    </button>
+                </div>
+            </form>
+            <div id="errorMsg" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center font-medium"></div>
+        </section>
+
+        <!-- Results Section (Hidden by default) -->
+        <section id="resultsSection" class="hidden fade-in space-y-8">
+            
+            <!-- Student Profile -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 shadow-sm border border-blue-100 flex items-center gap-4">
+                <div class="bg-blue-500 text-white h-16 w-16 rounded-full flex items-center justify-center text-2xl font-bold shadow-md">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div>
+                    <h2 id="resName" class="text-2xl font-bold text-gray-800"></h2>
+                    <p class="text-gray-600"><i class="far fa-calendar-alt mr-1"></i> <span id="resDob"></span> | <i class="fas fa-school mr-1"></i> <span id="resSchool"></span></p>
+                </div>
             </div>
-            <p style="margin-top:10px; font-size:0.9em;">* Gợi ý chỉ mang tính chất tham khảo, dựa trên điểm chuẩn năm trước.</p>
-        </div>
-    `;
-    document.getElementById('resultContainer').innerHTML = html;
-}
 
-// ---- Gợi ý khi nhập tên ----
-document.getElementById('searchInput').addEventListener('input', function() {
-    const keyword = this.value.trim().toLowerCase();
-    const sug = document.getElementById('suggestions');
-    if (!keyword || !dataLoaded) { sug.style.display = 'none'; return; }
-    const matched = allStudents.filter(s => s.name.toLowerCase().includes(keyword));
-    const uniqueNames = [...new Set(matched.map(s => s.name))].slice(0, 10);
-    if (uniqueNames.length === 0) { sug.style.display = 'none'; return; }
-    sug.innerHTML = uniqueNames.map(n => `<div class="suggestion-item" onclick="selectName('${n}')">${n}</div>`).join('');
-    sug.style.display = 'block';
-});
+            <!-- Scores Grid -->
+            <div>
+                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b-2 border-gray-200 pb-2"><i class="fas fa-clipboard-list text-blue-500 mr-2"></i> Kết quả các đợt khảo sát</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="scoresGrid">
+                    <!-- Cards will be injected here by JS -->
+                </div>
+            </div>
 
-function selectName(name) {
-    document.getElementById('searchInput').value = name;
-    document.getElementById('suggestions').style.display = 'none';
-    searchStudent();
-}
+            <!-- Analysis & Suggestions -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Trend Analysis -->
+                <div class="bg-white rounded-xl shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3"><i class="fas fa-chart-line text-green-500 mr-2"></i> Đánh giá xu hướng</h3>
+                    <div id="trendAnalysis" class="space-y-3 text-sm">
+                        <!-- Trend details injected here -->
+                    </div>
+                </div>
 
-// ---- Khởi động tải dữ liệu ----
-loadAllData();
-</script>
-</body>
-</html>
+                <!-- Best Combination -->
+                <div class="bg-white rounded-xl shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3"><i class="fas fa-layer-group text-purple-500 mr-2"></i> Tổ hợp môn tối ưu</h3>
+                    <p class="text-sm text-gray-600 mb-4">Dựa trên kết quả đợt gần nhất, hệ thống tính toán tổ hợp có điểm số cao nhất của bạn.</p>
+                    <div id="bestCombo" class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+                        <!-- Combo details injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Universities -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-university text-yellow-500 mr-2"></i> Gợi ý trường Đại học phù hợp</h3>
+                <p class="text-sm text-gray-600 mb-4">Dựa trên tổ hợp môn mạnh nhất của bạn (<span id="txtBestCombo" class="font-bold"></span>), dưới đây là một số trường và nhóm ngành bạn có thể tham khảo:</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-700 text-sm">
+                                <th class="p-3 rounded-tl-lg">Tên trường</th>
+                                <th class="p-3">Khoảng điểm chuẩn</th>
+                                <th class="p-3 rounded-tr-lg">Đặc điểm / Ngành tiêu biểu</th>
+                            </tr>
+                        </thead>
+                        <tbody id="uniList" class="text-sm divide-y divide-gray-200">
+                            <!-- Universities injected here -->
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mt-4 text-xs text-gray-500 italic">* Lưu ý: Đây là gợi ý mang tính chất tham khảo dựa trên phổ điểm các năm trước. Bạn cần kết hợp với sở thích và định hướng nghề nghiệp của bản thân.</p>
+            </div>
+
+        </section>
+    </main>
+
+    <footer class="bg-gray-800 text-white text-center py-6 mt-12">
+        <p class="text-sm text-gray-400">Hệ thống phân tích học tập © 2026</p>
+    </footer>
+
+    <script>
+        // ==========================================
+        // 1. DỮ LIỆU MẪU (MOCK DATA)
+        // Trong thực tế, bạn sẽ dùng fetch() để gọi file JSON được convert từ các file CSV của bạn.
+        // ==========================================
+        const db = {
+            "HungHoa": [
+                {
+                    "hoTen": "Nguyễn Văn A",
+                    "ngaySinh": "01/01/2006",
+                    "so1": { "Toán": 6.5, "Ngữ văn": 6.0, "Vật lí": 7.0, "Hóa học": 6.5 },
+                    "truong": { "Toán": 7.0, "Ngữ văn": 6.5, "Vật lí": 7.5, "Hóa học": 7.0 },
+                    "so2": { "Toán": 8.0, "Ngữ văn": 7.0, "Vật lí": 8.5, "Hóa học": 8.0 } // Tăng điểm
+                },
+                {
+                    "hoTen": "Trần Thị B",
+                    "ngaySinh": "15/05/2006",
+                    "so1": { "Toán": 7.5, "Ngữ văn": 8.0, "Tiếng Anh": 6.0, "Lịch sử": 7.5 },
+                    "truong": { "Toán": 7.0, "Ngữ văn": 7.5, "Tiếng Anh": 6.5, "Lịch sử": 7.0 },
+                    "so2": { "Toán": 7.5, "Ngữ văn": 8.5, "Tiếng Anh": 7.5, "Địa lí": 8.0 } // Đổi môn đợt 2 (Sử -> Địa)
+                }
+            ],
+            "TamNong": [
+                {
+                    "hoTen": "Lê Văn C",
+                    "ngaySinh": "20/10/2006",
+                    "so1": null, // Tam Nông chỉ có đợt Sở 2 theo mô tả
+                    "truong": null,
+                    "so2": { "Toán": 8.5, "Ngữ văn": 6.5, "Tiếng Anh": 8.0, "Vật lí": 7.5 }
+                }
+            ]
+        };
+
+        // Cơ sở dữ liệu trường Đại học để gợi ý
+        const universities = [
+            { name: "ĐH Bách Khoa Hà Nội", minScore: 25, maxScore: 29, desc: "Kỹ thuật, CNTT, Tự động hóa", blocks: ["A00", "A01", "D01"] },
+            { name: "ĐH Quốc gia Hà Nội (UET, KHTN)", minScore: 24, maxScore: 28, desc: "Khoa học cơ bản, Công nghệ", blocks: ["A00", "A01", "B00", "D01"] },
+            { name: "ĐH Kinh tế Quốc dân", minScore: 26, maxScore: 28.5, desc: "Kinh tế, Quản trị, Kế toán", blocks: ["A00", "A01", "D01"] },
+            { name: "ĐH Ngoại thương", minScore: 27, maxScore: 29, desc: "Kinh tế quốc tế, Ngôn ngữ", blocks: ["A00", "A01", "D01"] },
+            { name: "ĐH Sư phạm Hà Nội", minScore: 22, maxScore: 28, desc: "Sư phạm Toán, Văn, Anh...", blocks: ["A00", "C00", "D01", "B00"] },
+            { name: "ĐH Công nghiệp Hà Nội", minScore: 20, maxScore: 25, desc: "Kỹ thuật ứng dụng, Ngôn ngữ", blocks: ["A00", "A01", "D01"] },
+            { name: "ĐH Thương mại", minScore: 24, maxScore: 27, desc: "Thương mại điện tử, Marketing", blocks: ["A00", "A01", "D01"] },
+            { name: "Học viện Nông nghiệp VN", minScore: 16, maxScore: 22, desc: "Công nghệ sinh học, Thú y", blocks: ["A00", "B00", "D01"] },
+            { name: "ĐH Khoa học XH&NV (ĐHQGHN)", minScore: 23, maxScore: 28, desc: "Báo chí, Tâm lý học, Đông Phương", blocks: ["C00", "D01"] },
+            { name: "ĐH Thủy lợi", minScore: 18, maxScore: 24, desc: "Kỹ thuật tài nguyên, CNTT", blocks: ["A00", "A01", "D01"] },
+            { name: "ĐH Hùng Vương (Phú Thọ)", minScore: 15, maxScore: 20, desc: "Sư phạm, Kinh tế, Nông lâm (Gần nhà)", blocks: ["A00", "B00", "C00", "D01"] },
+            { name: "ĐH Lâm nghiệp", minScore: 15, maxScore: 19, desc: "Quản lý tài nguyên, Cảnh quan", blocks: ["A00", "B00", "D01"] },
+            { name: "ĐH Nội vụ Hà Nội", minScore: 21, maxScore: 25, desc: "Quản lý nhà nước, Luật", blocks: ["C00", "D01"] },
+            { name: "ĐH Mỏ - Địa chất", minScore: 16, maxScore: 22, desc: "Kỹ thuật Dầu khí, CNTT", blocks: ["A00", "A01"] }
+        ];
+
+        // Định nghĩa các tổ hợp môn
+        const blockDefs = {
+            "A00": ["Toán", "Vật lí", "Hóa học"],
+            "A01": ["Toán", "Vật lí", "Tiếng Anh"],
+            "B00": ["Toán", "Hóa học", "Sinh học"],
+            "C00": ["Ngữ văn", "Lịch sử", "Địa lí"],
+            "D01": ["Toán", "Ngữ văn", "Tiếng Anh"]
+        };
+
+        // ==========================================
+        // 2. LOGIC XỬ LÝ
+        // ==========================================
+        
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const school = document.getElementById('school').value;
+            const name = document.getElementById('studentName').value.trim().toLowerCase();
+            const dob = document.getElementById('dob').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            const resultsSection = document.getElementById('resultsSection');
+
+            // Ẩn thông báo lỗi & kết quả cũ
+            errorMsg.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+
+            // Tìm kiếm học sinh
+            const studentsInSchool = db[school] || [];
+            const student = studentsInSchool.find(s => 
+                s.hoTen.toLowerCase() === name && s.ngaySinh === dob
+            );
+
+            if (!student) {
+                errorMsg.textContent = "Không tìm thấy dữ liệu học sinh. Vui lòng kiểm tra lại Trường, Họ Tên hoặc Ngày Sinh.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            // Render dữ liệu nếu tìm thấy
+            renderStudentInfo(student, school);
+            renderScores(student);
+            
+            // Phân tích
+            const bestComboData = analyzeBestCombination(student.so2 || student.truong || student.so1);
+            analyzeTrend(student);
+            renderUniversities(bestComboData);
+
+            // Hiển thị kết quả
+            resultsSection.classList.remove('hidden');
+        });
+
+        function renderStudentInfo(student, schoolCode) {
+            document.getElementById('resName').textContent = student.hoTen;
+            document.getElementById('resDob').textContent = student.ngaySinh;
+            document.getElementById('resSchool').textContent = schoolCode === 'HungHoa' ? 'THPT Hưng Hóa' : 'THPT Tam Nông';
+        }
+
+        function renderScores(student) {
+            const grid = document.getElementById('scoresGrid');
+            grid.innerHTML = '';
+
+            const phases = [
+                { key: 'so1', name: 'Sở Đợt 1', color: 'bg-blue-50 border-blue-200' },
+                { key: 'truong', name: 'Khảo Sát Trường', color: 'bg-green-50 border-green-200' },
+                { key: 'so2', name: 'Sở Đợt 2', color: 'bg-orange-50 border-orange-200' }
+            ];
+
+            phases.forEach(phase => {
+                const data = student[phase.key];
+                if (!data) return; // Bỏ qua nếu không có dữ liệu đợt này
+
+                let subjectsHtml = '';
+                for (const [subject, score] of Object.entries(data)) {
+                    subjectsHtml += `
+                        <div class="flex justify-between items-center py-2 border-b border-gray-200/50 last:border-0">
+                            <span class="text-gray-700 font-medium">${subject}</span>
+                            <span class="text-blue-600 font-bold bg-white px-2 py-1 rounded shadow-sm text-sm">${score.toFixed(2)}</span>
+                        </div>
+                    `;
+                }
+
+                grid.innerHTML += `
+                    <div class="${phase.color} border rounded-xl p-5 shadow-sm">
+                        <h4 class="text-center font-bold text-gray-800 mb-4 pb-2 border-b border-gray-300/50">${phase.name}</h4>
+                        <div class="space-y-1">
+                            ${subjectsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function analyzeBestCombination(latestScores) {
+            const container = document.getElementById('bestCombo');
+            const txtBestCombo = document.getElementById('txtBestCombo');
+            
+            if (!latestScores) {
+                container.innerHTML = '<p class="text-gray-500">Không có dữ liệu điểm để tính toán.</p>';
+                txtBestCombo.textContent = "Chưa có dữ liệu";
+                return null;
+            }
+
+            let bestBlock = '';
+            let bestScore = 0;
+            let detailsHtml = '';
+
+            for (const [block, subjects] of Object.entries(blockDefs)) {
+                let total = 0;
+                let hasAll = true;
+                
+                subjects.forEach(sub => {
+                    if (latestScores[sub] !== undefined) {
+                        total += latestScores[sub];
+                    } else {
+                        hasAll = false; // Thiếu môn trong tổ hợp
+                    }
+                });
+
+                if (hasAll && total > bestScore) {
+                    bestScore = total;
+                    bestBlock = block;
+                }
+            }
+
+            if (bestBlock) {
+                const subjects = blockDefs[bestBlock].join(' + ');
+                container.innerHTML = `
+                    <div class="text-3xl font-extrabold text-purple-700 mb-1">${bestScore.toFixed(2)} <span class="text-lg text-purple-500 font-normal">điểm</span></div>
+                    <div class="text-lg font-bold text-gray-800">Khối ${bestBlock}</div>
+                    <div class="text-sm text-gray-600">(${subjects})</div>
+                `;
+                txtBestCombo.textContent = `Khối ${bestBlock} - ${bestScore.toFixed(2)} điểm`;
+                return { block: bestBlock, score: bestScore };
+            } else {
+                container.innerHTML = '<p class="text-red-500 text-sm">Không đủ điểm của 3 môn thuộc các khối cơ bản (A, A1, B, C, D1).</p>';
+                txtBestCombo.textContent = "Chưa xác định";
+                return null;
+            }
+        }
+
+        function analyzeTrend(student) {
+            const container = document.getElementById('trendAnalysis');
+            container.innerHTML = '';
+
+            // So sánh đợt mới nhất với đợt cũ nhất có dữ liệu
+            const phases = [student.so1, student.truong, student.so2].filter(Boolean);
+            
+            if (phases.length < 2) {
+                container.innerHTML = '<p class="text-gray-500 italic">Chưa đủ dữ liệu qua các đợt để so sánh xu hướng.</p>';
+                return;
+            }
+
+            const oldest = phases[0];
+            const newest = phases[phases.length - 1];
+            let totalDiff = 0;
+            let count = 0;
+
+            for (const subject in newest) {
+                if (oldest[subject] !== undefined) {
+                    const diff = newest[subject] - oldest[subject];
+                    totalDiff += diff;
+                    count++;
+                    
+                    let icon = diff > 0 ? '<i class="fas fa-arrow-up text-green-500"></i>' : (diff < 0 ? '<i class="fas fa-arrow-down text-red-500"></i>' : '<i class="fas fa-equals text-gray-400"></i>');
+                    let colorClass = diff > 0 ? 'text-green-600' : (diff < 0 ? 'text-red-600' : 'text-gray-500');
+                    let sign = diff > 0 ? '+' : '';
+
+                    container.innerHTML += `
+                        <div class="flex justify-between items-center border-b border-gray-100 pb-1">
+                            <span class="text-gray-700">${subject}</span>
+                            <span class="font-bold ${colorClass} bg-gray-50 px-2 py-1 rounded text-xs">${icon} ${sign}${diff.toFixed(2)}</span>
+                        </div>
+                    `;
+                }
+            }
+
+            // Nhận xét chung
+            if (count > 0) {
+                const avgDiff = totalDiff / count;
+                let summary = "";
+                if (avgDiff >= 0.5) summary = "Tuyệt vời! Phong độ của bạn đang tăng trưởng rất tốt.";
+                else if (avgDiff > 0) summary = "Tốt! Bạn đang có sự tiến bộ nhẹ, hãy tiếp tục duy trì.";
+                else if (avgDiff > -0.5) summary = "Chú ý! Điểm số đang có dấu hiệu chững lại hoặc giảm nhẹ. Cần ôn tập kỹ hơn.";
+                else summary = "Cảnh báo! Kết quả đang giảm sút đáng kể. Bạn cần rà soát lại phương pháp học tập ngay nhé.";
+
+                container.innerHTML += `<div class="mt-4 p-3 bg-blue-50 rounded-lg text-blue-800 text-sm font-medium border border-blue-100"><i class="fas fa-info-circle mr-1"></i> ${summary}</div>`;
+            }
+        }
+
+        function renderUniversities(comboData) {
+            const list = document.getElementById('uniList');
+            list.innerHTML = '';
+
+            if (!comboData) {
+                list.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-gray-500">Không có đủ dữ liệu tổ hợp để gợi ý.</td></tr>';
+                return;
+            }
+
+            const { block, score } = comboData;
+            
+            // Lọc trường có nhận khối này và điểm của học sinh nằm 
